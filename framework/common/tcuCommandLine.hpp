@@ -273,6 +273,15 @@ public:
 	//! Should the run be terminated on first failure (--deqp-terminate-on-fail)
 	bool							isTerminateOnFailEnabled	(void) const;
 
+	//! Get repeat count (--deqp-repeat-count)
+	int								getRepeatCount			(void) const;		// XROS: New option
+
+	//! Enable memory stats logging (--deqp-memory-stats)
+	bool							isMemoryStatsEnabled	(void) const;		// XROS: New option
+
+	//! Enable log << message to be output to the console (--deqp-console-log)
+	bool							isConsoleLogEnabled			(void) const;		// XROS: New option
+
 	/*--------------------------------------------------------------------*//*!
 	 * \brief Creates case list filter
 	 * \param archive Resources

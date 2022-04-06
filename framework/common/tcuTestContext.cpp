@@ -44,6 +44,7 @@ TestContext::TestContext (
 	, m_terminateAfter	(false)
 {
 	setCurrentArchive(m_rootArchive);
+	m_log.enableConsoleLogging(cmdLine.isConsoleLogEnabled());
 }
 
 void TestContext::writeSessionInfo(void)

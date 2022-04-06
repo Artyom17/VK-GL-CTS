@@ -378,6 +378,12 @@ vk::Move<vk::VkDevice> createTestDevice (const Context&									context,
 
 	try
 	{
+		TestLog&							log				= context.getTestContext().getLog();
+		for (size_t i = 0; i < deviceExtensions.size(); ++i)
+		{
+			log << TestLog::Message << "Extensions[" << i << "]: " << deviceExtensions[i] << TestLog::EndMessage;
+		}
+		log << TestLog::Message << "DeviceCreateInfo: " << deviceCreateInfo << TestLog::EndMessage;
 		return createCustomDevice(context.getTestContext().getCommandLine().isValidationEnabled(), vkp, instance, vki, physicalDevice, &deviceCreateInfo);
 	}
 	catch (const vk::Error& error)
@@ -537,7 +543,7 @@ void checkImageSupport (const vk::InstanceInterface&						vki,
 		}
 	};
 
-	vki.getPhysicalDeviceImageFormatProperties2(device, &info, &properties);
+	VK_CHECK(vki.getPhysicalDeviceImageFormatProperties2(device, &info, &properties));
 
 	if ((externalProperties.externalMemoryProperties.externalMemoryFeatures & vk::VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT) == 0)
 		TCU_THROW(NotSupportedError, "External handle type doesn't support exporting image");
@@ -2995,6 +3001,7 @@ deUint32 getExportedMemoryTypeIndex(const vk::InstanceDriver& vki, const vk::VkP
 
 tcu::TestStatus testMemoryImportTwice (Context& context, MemoryTestConfig config)
 {
+	TestLog&								log				= context.getTestContext().getLog();
 	const vk::PlatformInterface&			vkp					(context.getPlatformInterface());
 	const CustomInstance					instance			(createTestInstance(context, 0u, config.externalType, 0u));
 	const vk::InstanceDriver&				vki					(instance.getDriver());
@@ -3016,21 +3023,27 @@ tcu::TestStatus testMemoryImportTwice (Context& context, MemoryTestConfig config
 	const vk::Unique<vk::VkDeviceMemory>		memory					(allocateExportableMemory(vkd, *device, requirements.size, exportedMemoryTypeIndex, config.externalType, config.dedicated ? *buffer : (vk::VkBuffer)0));
 	NativeHandle								handleA;
 
+	log << TestLog::Message << "!HOST VIS: " << (int)config.hostVisible << TestLog::EndMessage;
 	if (config.hostVisible)
 		writeHostMemory(vkd, *device, *memory, testData.size(), &testData[0]);
+	log << TestLog::Message << "!WRITTEN 1! " << TestLog::EndMessage;
 
 	getMemoryNative(vkd, *device, *memory, config.externalType, handleA);
 
 	{
 		const vk::Unique<vk::VkBuffer>			bufferA	(createExternalBuffer(vkd, *device, queueFamilyIndex, config.externalType, bufferSize, 0u, usage));
 		const vk::Unique<vk::VkBuffer>			bufferB	(createExternalBuffer(vkd, *device, queueFamilyIndex, config.externalType, bufferSize, 0u, usage));
+		log << TestLog::Message << "! bufferA " << *bufferA << TestLog::EndMessage;
+		log << TestLog::Message << "! bufferB " << *bufferB << TestLog::EndMessage;
 		NativeHandle							handleB	(handleA);
 		const vk::Unique<vk::VkDeviceMemory>	memoryA	(config.dedicated
 														 ? importDedicatedMemory(vkd, *device, *bufferA, requirements, config.externalType, exportedMemoryTypeIndex, handleA)
 														 : importMemory(vkd, *device, requirements, config.externalType, exportedMemoryTypeIndex, handleA));
+		log << TestLog::Message << "! memoryA " << *memoryA << " config.dedicated? " << (int)config.dedicated << TestLog::EndMessage;
 		const vk::Unique<vk::VkDeviceMemory>	memoryB	(config.dedicated
 														 ? importDedicatedMemory(vkd, *device, *bufferB, requirements, config.externalType, exportedMemoryTypeIndex, handleB)
 														 : importMemory(vkd, *device, requirements, config.externalType, exportedMemoryTypeIndex, handleB));
+		log << TestLog::Message << "! memoryB " << *memoryB << " config.dedicated? " << (int)config.dedicated << TestLog::EndMessage;
 
 		if (config.hostVisible)
 		{
@@ -3040,8 +3053,11 @@ tcu::TestStatus testMemoryImportTwice (Context& context, MemoryTestConfig config
 			checkHostMemory(vkd, *device, *memoryA, testData.size(), &testData[0]);
 			checkHostMemory(vkd, *device, *memoryB, testData.size(), &testData[0]);
 
+			log << TestLog::Message << "! writeHostMemory 1" << TestLog::EndMessage;
 			writeHostMemory(vkd, *device, *memoryA, testData.size(), &testDataA[0]);
+			log << TestLog::Message << "! writeHostMemory 2" << TestLog::EndMessage;
 			writeHostMemory(vkd, *device, *memoryB, testData.size(), &testDataB[0]);
+			log << TestLog::Message << "! writeHostMemory 3" << TestLog::EndMessage;
 
 			checkHostMemory(vkd, *device, *memoryA, testData.size(), &testDataB[0]);
 			checkHostMemory(vkd, *device, *memory, testData.size(), &testDataB[0]);
@@ -3283,7 +3299,7 @@ tcu::TestStatus testMemoryFdDup2 (Context& context, MemoryTestConfig config)
 #else
 	DE_UNREF(context);
 	DE_UNREF(config);
-	TCU_THROW(NotSupportedError, "Platform doesn't support dup()");
+	TCU_THROW(NotSupportedError, "Platform doesn't support dup2()");
 #endif
 }
 
@@ -3348,7 +3364,7 @@ tcu::TestStatus testMemoryFdDup3 (Context& context, MemoryTestConfig config)
 #else
 	DE_UNREF(context);
 	DE_UNREF(config);
-	TCU_THROW(NotSupportedError, "Platform doesn't support dup()");
+	TCU_THROW(NotSupportedError, "Platform doesn't support dup3()");
 #endif
 }
 
@@ -3800,7 +3816,8 @@ tcu::TestStatus testImageBindExportImportBind (Context&					context,
 	const deUint32							queueFamilyIndex	(chooseQueueFamilyIndex(vki, physicalDevice, 0u));
 	const vk::Unique<vk::VkDevice>			device				(createTestDevice(context, vkp, instance, vki, physicalDevice, 0u, config.externalType, 0u, queueFamilyIndex, config.dedicated));
 	const vk::DeviceDriver					vkd					(vkp, instance, *device);
-	const vk::VkImageUsageFlags				usage				= vk::VK_IMAGE_USAGE_TRANSFER_SRC_BIT | vk::VK_IMAGE_USAGE_TRANSFER_DST_BIT | (config.externalType == vk::VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID ? vk::VK_IMAGE_USAGE_SAMPLED_BIT : 0);
+	const vk::VkImageUsageFlags				usage				= vk::VK_IMAGE_USAGE_TRANSFER_SRC_BIT | vk::VK_IMAGE_USAGE_TRANSFER_DST_BIT | 
+		(config.externalType == vk::VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID ? vk::VK_IMAGE_USAGE_SAMPLED_BIT : 0);
 	const vk::VkFormat						format				= vk::VK_FORMAT_R8G8B8A8_UNORM;
 	const deUint32							width				= 64u;
 	const deUint32							height				= 64u;
@@ -4151,8 +4168,10 @@ tcu::TestStatus testAndroidHardwareBufferImageFormat  (Context& context, vk::VkF
 			usage |= usageFlags[usageNdx];
 			requiredAhbUsage |= ahbApi->vkUsageToAhbUsage(usageFlags[usageNdx]);
 		}
+		log << TestLog::Message << "Combo: " << combo << " / " << numOfFlagCombos << TestLog::EndMessage;
 		for (size_t createFlagNdx = 0; createFlagNdx < numOfCreateFlags; createFlagNdx++)
 		{
+			log << TestLog::Message << "createFlagNdx: " << createFlagNdx << " / " << numOfCreateFlags << TestLog::EndMessage;
 			const size_t	bit	= numOfUsageFlags + createFlagNdx;
 			if ((combo & (one << bit)) == 0)
 				continue;
@@ -4239,7 +4258,8 @@ tcu::TestStatus testAndroidHardwareBufferImageFormat  (Context& context, vk::VkF
 			// The AHB usage flags corresponding to the create and usage flags used in info must be present.
 			TCU_CHECK((ahbUsageProperties.androidHardwareBufferUsage & requiredAhbUsage) == requiredAhbUsage);
 
-			log << TestLog::Message << "Required flags: " << std::hex << requiredAhbUsage << " Actual flags: " << std::hex << ahbUsageProperties.androidHardwareBufferUsage
+			log << TestLog::Message << "Iteration: " << tilingIndex << " / " << numOfTilings 
+				<< " Required flags: " << std::hex << requiredAhbUsage << " Actual flags: " << std::hex << ahbUsageProperties.androidHardwareBufferUsage
 				<< TestLog::EndMessage;
 
 			struct ImageSize

@@ -29,6 +29,7 @@
 
 namespace tcu
 {
+static void print_memory_usage(); //!AB
 
 using std::vector;
 
@@ -138,6 +139,11 @@ bool TestSessionExecutor::iterate (void)
 				TestCase* const					testCase	= static_cast<TestCase*>(m_iterator.getNode());
 				const TestCase::IterateResult	iterResult	= iterateTestCase(testCase);
 
+#if DE_OS == DE_OS_ANDROID
+				// Collect and print to the log the memory stats if requested.  XROS new function
+				if (testCase->getTestContext().getCommandLine().isMemoryStatsEnabled())
+					print_memory_usage();
+#endif
 				if (iterResult == TestCase::STOP)
 					m_state = STATE_TRAVERSE_HIERARCHY;
 
@@ -321,4 +327,41 @@ TestCase::IterateResult TestSessionExecutor::iterateTestCase (TestCase* testCase
 	return iterateResult;
 }
 
+/**
+ * Support to read process stats info on XROS.
+ */
+#if DE_OS == DE_OS_ANDROID
+
+/**
+ * Utility to collect and print CTS process stats on XROS.
+ */
+static void print_memory_usage() {
+
+	struct mallinfo stats = mallinfo();
+	tcu::print("Total number of non-mmapped bytes         = %20zu\n",
+		stats.arena);
+	tcu::print("Number of free chunks                     = %20zu\n",
+		stats.ordblks);
+	tcu::print("Total number of bytes in mmapped regions  = %20zu\n",
+		stats.hblkhd);
+	tcu::print("Total allocated space (normal or mmapped) = %20zu\n",
+		stats.uordblks);
+	tcu::print("Total free space                          = %20zu\n",
+		stats.fordblks);
+	tcu::print("number of bytes releasable by a trim      = %20zu\n",
+		stats.keepcost);
+
+	tcu::print("\netc/meminfo:\n");	
+	FILE* f = fopen("/proc/meminfo", "r");
+	if (f) {
+		while(!feof(f)) {
+			char s[256];
+			if (fgets(s, (int)sizeof(s) - 1, f)) {
+				tcu::print("%s", s);	
+			}
+		}
+		fclose(f);
+	}
+}
+#endif
 } // tcu

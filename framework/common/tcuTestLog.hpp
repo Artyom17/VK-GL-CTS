@@ -177,11 +177,13 @@ public:
 	void				endSampleList			(void);
 
 	bool				isShaderLoggingEnabled	(void);
+	void				enableConsoleLogging(bool enable) { m_consoleLoggingEnabled = enable; }
 private:
 						TestLog					(const TestLog& other); // Not allowed!
 	TestLog&			operator=				(const TestLog& other); // Not allowed!
 
 	qpTestLog*			m_log;
+	bool				m_consoleLoggingEnabled = false;
 };
 
 class MessageBuilder
